@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lakshmi Textiles Inventory System</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      background-color: #f9fafb;
+      color: #333;
+      display: flex;
+      min-height: 100vh;
+    }
+    /* Sidebar */
+    .sidebar {
+      width: 240px;
+      background-color: #1e3a8a;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 20px;
+    }
+    .sidebar h2 { font-size: 20px; margin-bottom: 20px; }
+    .nav-btn {
+      background: none;
+      border: none;
+      color: white;
+      font-size: 16px;
+      margin: 10px 0;
+      cursor: pointer;
+      width: 100%;
+      padding: 10px 20px;
+      text-align: left;
+    }
+    .nav-btn:hover { background-color: #2563eb; }
+    main {
+      flex: 1;
+      padding: 20px;
+      overflow-y: auto;
+    }
+    h1, h2 { color: #1e3a8a; }
+
+    /* Forms */
+    form {
+      background: white;
+      padding: 15px;
+      border-radius: 10px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+      max-width: 400px;
+    }
+    input, select, button {
+      width: 100%;
+      padding: 10px;
+      margin: 8px 0;
+      border-radius: 5px;
+      border: 1px solid #ccc;
+      font-size: 16px;
+    }
+    button {
+      background-color: #2563eb;
+      color: white;
+      border: none;
+      cursor: pointer;
+    }
+    button:hover { background-color: #1d4ed8; }
+
+    /* Toast popup */
+    #toast {
+      visibility: hidden;
+      min-width: 250px;
+      background-color: #333;
+      color: #fff;
+      text-align: center;
+      border-radius: 5px;
+      padding: 10px;
+      position: fixed;
+      z-index: 1;
+      left: 50%;
+      bottom: 30px;
+      transform: translateX(-50%);
+    }
+    #toast.show {
+      visibility: visible;
+      animation: fadein 0.5s, fadeout 0.5s 2.5s;
+    }
+    @keyframes fadein { from {bottom: 0; opacity: 0;} to {bottom: 30px; opacity: 1;} }
+    @keyframes fadeout { from {bottom: 30px; opacity: 1;} to {bottom: 0; opacity: 0;} }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: white;
+      margin-top: 10px;
+      border-radius: 10px;
+      overflow: hidden;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #ddd;
+      text-align: left;
+    }
+    th {
+      background-color: #1e3a8a;
+      color: white;
+    }
+    tr:nth-child(even) { background-color: #f3f4f6; }
+
+    @media (max-width: 768px) {
+      body { flex-direction: column; }
+      .sidebar { flex-direction: row; width: 100%; justify-content: space-around; }
+      .nav-btn { text-align: center; font-size: 14px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="sidebar">
+    <h2>Lakshmi Textiles</h2>
+    <button class="nav-btn" onclick="navigateTo('dashboard')">🏠 Dashboard</button>
+    <button class="nav-btn" onclick="navigateTo('addStock')">➕ Add Stock</button>
+    <button class="nav-btn" onclick="navigateTo('sellProduct')">💰 Sell Product</button>
+    <button class="nav-btn" onclick="navigateTo('orders')">📦 Orders</button>
+    <button class="nav-btn" onclick="navigateTo('customization')">🎨 Customizations</button>
+    <button class="nav-btn" onclick="navigateTo('reports')">📊 Reports</button>
+  </div>
+
+  <main id="mainContent"></main>
+
+  <div id="toast"></div>
+
+  <script>
+    let state = JSON.parse(localStorage.getItem('laxmi_inventory_v2')) || {
+      inventory: [],
+      sales: [],
+      orders: [],
+      jobs: []
+    };
+
+    function saveState() {
+      localStorage.setItem('laxmi_inventory_v2', JSON.stringify(state));
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.innerText = msg;
+      toast.className = 'show';
+      setTimeout(() => toast.className = toast.className.replace('show', ''), 3000);
+    }
+
+    function navigateTo(page) {
+      if (page === 'dashboard') renderDashboard();
+      if (page === 'addStock') renderAddStock();
+      if (page === 'sellProduct') renderSellProduct();
+      if (page === 'orders') renderOrders();
+      if (page === 'customization') renderCustomization();
+      if (page === 'reports') renderReports();
+    }
+
+    // ------------------ DASHBOARD ------------------
+    function renderDashboard() {
+      const totalProducts = state.inventory.length;
+      const totalStock = state.inventory.reduce((sum, item) => sum + item.qty, 0);
+      const today = new Date().toISOString().split("T")[0];
+      const todaySales = state.sales.filter(s => s.date.startsWith(today))
+        .reduce((sum, s) => sum + (s.qty * s.price), 0);
+
+      document.getElementById('mainContent').innerHTML = `
+        <h1>Dashboard</h1>
+        <p><b>Total Products:</b> ${totalProducts}</p>
+        <p><b>Total Stock:</b> ${totalStock}</p>
+        <p><b>Today's Sales:</b> ₹${todaySales}</p>
+      `;
+    }
+
+    // ------------------ ADD STOCK ------------------
+    function renderAddStock() {
+      document.getElementById('mainContent').innerHTML = `
+        <h2>Add New Stock</h2>
+        <form onsubmit="addStock(event)">
+          <input id="productName" placeholder="Product Name" required />
+          <input id="qty" type="number" placeholder="Quantity" required />
+          <input id="price" type="number" placeholder="Price" required />
+          <button type="submit">Add Stock</button>
+        </form>
+      `;
+    }
+
+    function addStock(e) {
+      e.preventDefault();
+      const name = document.getElementById('productName').value.trim();
+      const qty = parseInt(document.getElementById('qty').value);
+      const price = parseFloat(document.getElementById('price').value);
+
+      const existing = state.inventory.find(p => p.name === name);
+      if (existing) existing.qty += qty;
+      else state.inventory.push({ name, qty, price });
+
+      saveState();
+      showToast(`${name} added to inventory`);
+      renderDashboard();
+    }
+
+    // ------------------ SELL PRODUCT ------------------
+    function renderSellProduct() {
+      const options = state.inventory.map(p => `<option value="${p.name}">${p.name} (Available: ${p.qty})</option>`).join('');
+      document.getElementById('mainContent').innerHTML = `
+        <h2>Sell Product</h2>
+        <form onsubmit="sellProduct(event)">
+          <select id="sellProductName">${options}</select>
+          <input id="sellQty" type="number" placeholder="Quantity" required />
+          <button type="submit">Sell</button>
+        </form>
+      `;
+    }
+
+    function sellProduct(e) {
+      e.preventDefault();
+      const name = document.getElementById('sellProductName').value;
+      const qty = parseInt(document.getElementById('sellQty').value);
+
+      const item = state.inventory.find(p => p.name === name);
+      if (!item || item.qty < qty) {
+        showToast("Not enough stock!");
+        return;
+      }
+
+      item.qty -= qty;
+      state.sales.push({ name, qty, price: item.price, date: new Date().toISOString() });
+      saveState();
+
+      showToast(`${qty} units of ${name} sold`);
+      renderDashboard();
+    }
+
+    // ------------------ ORDERS ------------------
+    function renderOrders() {
+      const options = state.inventory.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+      document.getElementById('mainContent').innerHTML = `
+        <h2>Place Order</h2>
+        <form onsubmit="placeOrder(event)">
+          <select id="orderProduct">${options}</select>
+          <input id="orderQty" type="number" placeholder="Quantity" required />
+          <input id="orderETA" placeholder="Estimated Arrival (e.g. 2 days)" required />
+          <button type="submit">Place Order</button>
+        </form>
+      `;
+    }
+
+    function placeOrder(e) {
+      e.preventDefault();
+      const product = document.getElementById("orderProduct").value;
+      const qty = parseInt(document.getElementById("orderQty").value);
+      const eta = document.getElementById("orderETA").value;
+
+      const item = state.inventory.find(p => p.name === product);
+      if (!item) {
+        showToast("Product not available in inventory.");
+        return;
+      }
+
+      const order = { product, qty, eta, date: new Date().toISOString() };
+      state.orders.push(order);
+      saveState();
+
+      showToast(`${qty} units of ${product} ordered (ETA: ${eta})`);
+      renderDashboard();
+    }
+
+    // ------------------ CUSTOMIZATION ------------------
+    function renderCustomization() {
+      document.getElementById('mainContent').innerHTML = `
+        <h2>Customization Queue</h2>
+        <p>Feature implemented earlier for managing real-time jobs.</p>
+      `;
+    }
+
+    // ------------------ REPORTS ------------------
+    function renderReports() {
+      const today = new Date().toISOString().split("T")[0];
+      const todayOrders = state.orders.filter(o => o.date.startsWith(today));
+      const todaySales = state.sales.filter(s => s.date.startsWith(today));
+      const todayStocks = state.inventory.filter(i => i.addedOn && i.addedOn.startsWith(today));
+
+      let html = `<h2>Today's Activity</h2>
+        <table>
+          <tr><th>Type</th><th>Product</th><th>Quantity</th><th>ETA</th><th>Date</th></tr>
+      `;
+
+      todayOrders.forEach(order => {
+        html += `<tr>
+          <td>Order</td>
+          <td>${order.product}</td>
+          <td>${order.qty}</td>
+          <td>${order.eta}</td>
+          <td>${new Date(order.date).toLocaleString()}</td>
+        </tr>`;
+      });
+
+      todaySales.forEach(sale => {
+        html += `<tr>
+          <td>Sale</td>
+          <td>${sale.name}</td>
+          <td>${sale.qty}</td>
+          <td>-</td>
+          <td>${new Date(sale.date).toLocaleString()}</td>
+        </tr>`;
+      });
+
+      html += `</table>`;
+      document.getElementById('mainContent').innerHTML = html;
+    }
+
+    // Initial render
+    renderDashboard();
+  </script>
+</body>
+</html>
